@@ -193,22 +193,25 @@ with box:
     trending = demo_trending_top(n=topn)
     trending = add_logos(trending, col_name="ticker")
 
-    styled = (
-        trending[["logo", "ticker", "mentions", "pulse"]]
-        .style.format({"mentions": "{:,}", "pulse": "{:.2f}"})
-        .bar(subset=["pulse"], color="#22c55e")   # green pulse bar
-    )
-
     st.dataframe(
-        styled,
-        width="stretch", height=420, hide_index=True,
-        column_config={
-            "logo": st.column_config.ImageColumn("Company", width="small"),
-            "ticker": st.column_config.TextColumn("ticker"),
-            "mentions": st.column_config.NumberColumn("mentions", format="%,d"),
-            "pulse": st.column_config.NumberColumn("pulse", format="%.2f"),
-        },
-    )
+    trending[["logo", "ticker", "mentions", "pulse"]],
+    width="stretch",
+    height=420,
+    hide_index=True,
+    column_config={
+        "logo": st.column_config.ImageColumn("Company", width="small"),
+        "ticker": st.column_config.TextColumn("ticker"),
+        "mentions": st.column_config.NumberColumn("mentions", format="%,d"),
+        # nice in-cell bar without pandas Styler
+        "pulse": st.column_config.ProgressColumn(
+            "pulse",
+            min_value=0,
+            max_value=100,
+            format="%.0f",
+        ),
+    },
+)
+
 
 st.download_button(
     "Download CSV",
