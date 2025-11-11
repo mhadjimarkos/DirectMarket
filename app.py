@@ -206,34 +206,52 @@ with tab_overview:
     with a2: days_sel = st.selectbox("Window", [7, 14, 30, 60, 90], index=0)
     with a3: run_btn = st.button("Analyze", use_container_width=True)
 
-    if run_btn and ticker:
-        with st.spinner("Fetching price data…"):
-            price_df = get_price_data(ticker, days=int(days_sel))
+    # ---- Free-plan quota (inside Overview tab) ----
+from datetime import date  # keep at top if you prefer
 
-        if price_df.empty:
-            st.warning("No price data returned. Try another ticker or change the window.")
-        else:
-            start_ts = price_df["Datetime"].min()
-            end_ts   = price_df["Datetime"].max()
-            freq     = "h" if int(days_sel) <= 30 else "D"
-            senti_df = demo_sentiment_series(start_ts, end_ts, freq=freq, seed=abs(hash(ticker)) % (2**32))
-            senti_df = senti_df.set_index("Datetime").reindex(price_df["Datetime"]).interpolate().reset_index()
+if "quota_date" not in st.session_state or st.session_state.quota_date != str(date.today()):
+    st.session_state.quota_date = str(date.today())
+    st.session_state.quota = 3  # free analyses/day
 
-            card = st.container(border=True)
-            with card:
-                st.markdown(f"#### {ticker}")
-                st.plotly_chart(price_pulse_chart(price_df, senti_df, ticker), use_container_width=True)
+st.caption(f"Free plan: {st.session_state.quota} analyses left today.")
 
-                latest = price_df["Close"].iloc[-1]
-                first  = price_df["Close"].iloc[0]
-                pct    = 100.0 * (latest - first) / first
-                vol    = price_df["Close"].pct_change().std() * 100 * (252**0.5)
-                pulse  = float(senti_df["sentiment"].iloc[-1])
+clicked = run_btn
+if clicked and st.session_state.quota <= 0:
+    st.warning("You’ve reached today’s free limit. Upgrade to Pro for unlimited analyses.")
+    clicked = False
+elif clicked:
+    st.session_state.quota -= 1
 
-                k1, k2, k3 = st.columns(3)
-                with k1: kpi("Last Price", fmt_money(latest), f"{fmt_pct(pct)} over {days_sel}d")
-                with k2: kpi("Latest Pulse", f"{pulse:,.1f}", "demo series")
-                with k3: kpi("Volatility (ann.)", fmt_pct(vol), "rough estimate")
+# use `clicked` instead of `run_btn`
+if clicked and ticker:
+    with st.spinner("Fetching price data…"):
+        price_df = get_price_data(ticker, days=int(days_sel))
+
+    if price_df.empty:
+        st.warning("No price data returned. Try another ticker or change the window.")
+    else:
+        start_ts = price_df["Datetime"].min()
+        end_ts   = price_df["Datetime"].max()
+        freq     = "h" if int(days_sel) <= 30 else "D"
+        senti_df = demo_sentiment_series(start_ts, end_ts, freq=freq, seed=abs(hash(ticker)) % (2**32))
+        senti_df = senti_df.set_index("Datetime").reindex(price_df["Datetime"]).interpolate().reset_index()
+
+        card = st.container(border=True)
+        with card:
+            st.markdown(f"#### {ticker}")
+            st.plotly_chart(price_pulse_chart(price_df, senti_df, ticker), use_container_width=True)
+
+            latest = price_df["Close"].iloc[-1]
+            first  = price_df["Close"].iloc[0]
+            pct    = 100.0 * (latest - first) / first
+            vol    = price_df["Close"].pct_change().std() * 100 * (252**0.5)
+            pulse  = float(senti_df["sentiment"].iloc[-1])
+
+            k1, k2, k3 = st.columns(3)
+            with k1: kpi("Last Price", fmt_money(latest), f"{fmt_pct(pct)} over {days_sel}d")
+            with k2: kpi("Latest Pulse", f"{pulse:,.1f}", "demo series")
+            with k3: kpi("Volatility (ann.)", fmt_pct(vol), "rough estimate")
+
 
 # ===== WATCHLIST =====
 with tab_watchlist:
